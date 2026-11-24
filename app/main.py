@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 
 from app.config import settings
 from app.schemas import ErrorResponse, LinkAnalysisRequest, LinkAnalysisResponse
@@ -87,8 +87,12 @@ async def website_extraction_exception_handler(request: Request, exc: WebsiteExt
 
 
 @app.get("/", tags=["General"])
-async def root():
+async def root(request: Request):
     """Service status and quick links."""
+    accept_header = request.headers.get("accept", "")
+    if "text/html" in accept_header:
+        return HTMLResponse(content=HTML_TESTER, status_code=200)
+
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
@@ -157,6 +161,130 @@ async def analyze_link(payload: LinkAnalysisRequest) -> LinkAnalysisResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred during website analysis: {str(exc)}"
         )
+
+
+HTML_TESTER = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Link Analysis API | Live Interactive Tester</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; line-height: 1.5; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 32px; padding: 24px 0; border-bottom: 1px solid #1e293b; }
+        .badge { display: inline-block; background: #0284c7; color: white; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 12px; }
+        h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #ffffff; }
+        p.subtitle { color: #94a3b8; font-size: 15px; }
+        .links-bar { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
+        .links-bar a { color: #38bdf8; text-decoration: none; font-size: 13px; font-weight: 500; background: #1e293b; padding: 6px 14px; border-radius: 6px; border: 1px solid #334155; }
+        .links-bar a:hover { background: #334155; }
+        .card { background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); margin-bottom: 24px; }
+        .input-group { display: flex; gap: 12px; }
+        input[type="url"] { flex: 1; padding: 14px 18px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #ffffff; font-size: 15px; outline: none; }
+        input[type="url"]:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
+        button { padding: 14px 28px; border-radius: 8px; border: none; background: #0284c7; color: white; font-weight: 600; font-size: 15px; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+        button:hover { background: #0369a1; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .notice { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+        #output { margin-top: 24px; display: none; }
+        pre { background: #020617; padding: 20px; border-radius: 8px; overflow-x: auto; color: #a5f3fc; font-size: 13px; border: 1px solid #1e293b; max-height: 600px; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #ffffff; border-radius: 50%; border-top-color: transparent; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="badge">Dxora Technologies Practical Test</span>
+            <h1>AI-Powered Website Link Analysis API</h1>
+            <p class="subtitle">Extracts, comprehends, and generates structured 5-section strategic intelligence for any website URL.</p>
+            <div class="links-bar">
+                <a href="/docs" target="_blank">Interactive Swagger Docs (/docs)</a>
+                <a href="/health" target="_blank">Health Check (/health)</a>
+                <a href="https://github.com/memayank4u/link-analysis" target="_blank">GitHub Repository</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="font-size: 18px; margin-bottom: 12px;">Test Any Website URL</h2>
+            <div class="input-group">
+                <input type="url" id="targetUrl" value="https://example.com" placeholder="https://example.com" required>
+                <button id="submitBtn" onclick="analyzeUrl()">Analyze Website</button>
+            </div>
+            <p class="notice">Note: The underlying REST endpoint is <code>POST /link-analysis</code> with JSON body <code>{"url": "..."}</code>.</p>
+        </div>
+
+        <div id="output" class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="font-size: 16px;">Structured Response (JSON)</h3>
+                <span id="timingBadge" style="font-size: 12px; color: #38bdf8;"></span>
+            </div>
+            <pre><code id="jsonResult"></code></pre>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeUrl() {
+            const urlInput = document.getElementById('targetUrl');
+            const submitBtn = document.getElementById('submitBtn');
+            const outputDiv = document.getElementById('output');
+            const jsonResult = document.getElementById('jsonResult');
+            const timingBadge = document.getElementById('timingBadge');
+
+            const url = urlInput.value.trim();
+            if (!url) return alert('Please enter a valid website URL');
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+            outputDiv.style.display = 'block';
+            jsonResult.textContent = 'Fetching and analyzing website content...';
+            timingBadge.textContent = '';
+
+            const startTime = performance.now();
+            try {
+                const response = await fetch('/link-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+                const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+                timingBadge.textContent = `Completed in ${elapsed}s (HTTP ${response.status})`;
+                jsonResult.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                jsonResult.textContent = 'Error: ' + err.message;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Analyze Website';
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+
+
+@app.get("/link-analysis", include_in_schema=False)
+async def link_analysis_browser_view(request: Request):
+    """
+    Handle direct browser clicks to /link-analysis.
+    Returns an interactive HTML UI for browser visits, or guidance JSON for API clients.
+    """
+    accept_header = request.headers.get("accept", "")
+    if "text/html" in accept_header:
+        return HTMLResponse(content=HTML_TESTER, status_code=200)
+
+    return {
+        "message": "The /link-analysis endpoint requires an HTTP POST request.",
+        "expected_method": "POST",
+        "expected_payload": {"url": "https://example.com"},
+        "interactive_docs": "/docs",
+        "sample_curl": f'curl -X POST "{request.base_url}link-analysis" -H "Content-Type: application/json" -d \'{"url": "https://example.com"}\''
+    }
 
 
 if __name__ == "__main__":
