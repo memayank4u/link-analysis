@@ -98,6 +98,9 @@ This project implements an enterprise-grade REST API endpoint (`POST /link-analy
 ```text
 ai-link-analysis/
 │
+├── .github/
+│   └── workflows/
+│       └── ci.yml                  # Automated GitHub Actions test runner & smoke tests
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                     # FastAPI application setup & endpoints
@@ -121,6 +124,9 @@ ai-link-analysis/
 │   ├── test_extractor.py           # Unit tests for HTML parser & extraction
 │   └── test_link_analysis.py       # Integration tests for FastAPI endpoints
 │
+├── run.py                          # Unified application startup runner
+├── start.bat                       # Windows one-click startup runner
+├── start.sh                        # Linux / macOS startup script
 ├── Dockerfile                      # Production container definition
 ├── docker-compose.yml              # Local container orchestration
 ├── pytest.ini                      # Pytest async and discovery configuration
@@ -203,9 +209,22 @@ CACHE_TTL_SECONDS=3600
 
 ## 5. Running the Application
 
-### Option A: Direct Uvicorn Execution
+### Option A: Using the Runner Script (Recommended)
 
-Start the local server on the required port (`4000`):
+```bash
+# Direct runner
+python run.py
+
+# Or on Windows
+start.bat
+
+# Or on Linux / macOS
+chmod +x start.sh && ./start.sh
+```
+
+### Option B: Direct Uvicorn Execution
+
+Start the local server on port `4000`:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 4000
